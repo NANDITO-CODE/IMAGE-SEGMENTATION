@@ -46,43 +46,38 @@ bool operator<(const edge &a, const edge &b) {
  * c: constant for treshold function.
  */
 universe *segment_graph(int num_vertices, int num_edges, edge *edges, 
-  float c) { 
-// Sort edges by weight (this step is typically already parallelized in std::sort)
-std::sort(edges, edges + num_edges);
+			float c) { 
+  // sort edges by weight
+  std::sort(edges, edges + num_edges);
 
-// Create a disjoint-set forest
-universe *u = new universe(num_vertices);
+  // make a disjoint-set forest
+  universe *u = new universe(num_vertices);
 
-// Initialize thresholds (this can be parallelized)
-float *threshold = new float[num_vertices];
+  // init thresholds
+  float *threshold = new float[num_vertices];
+  for (int i = 0; i < num_vertices; i++)
+    threshold[i] = THRESHOLD(1,c);
 
-#pragma omp parallel for
-for (int i = 0; i < num_vertices; i++) {
-threshold[i] = THRESHOLD(1, c);
-}
-
-// Iterate over edges and perform the union-find operation
-#pragma omp parallel for
-for (int i = 0; i < num_edges; i++) {
-edge *pedge = &edges[i];
-
-// Components connected by this edge
-int a = u->find(pedge->a);
-int b = u->find(pedge->b);
-
-if (a != b) {
-  if ((pedge->w <= threshold[a]) && (pedge->w <= threshold[b])) {
-    u->join(a, b);
-    a = u->find(a);
-    threshold[a] = pedge->w + THRESHOLD(u->size(a), c);
+  // for each edge, in non-decreasing weight order...
+  for (int i = 0; i < num_edges; i++) {
+    edge *pedge = &edges[i];
+    
+    // components conected by this edge
+    int a = u->find(pedge->a);
+    int b = u->find(pedge->b);
+    if (a != b) {
+      if ((pedge->w <= threshold[a]) &&
+	  (pedge->w <= threshold[b])) {
+	u->join(a, b);
+	a = u->find(a);
+	threshold[a] = pedge->w + THRESHOLD(u->size(a), c);
+      }
+    }
   }
-}
-}
 
-// Free up
-delete[] threshold;
-return u;
+  // free up
+  delete threshold;
+  return u;
 }
-
 
 #endif

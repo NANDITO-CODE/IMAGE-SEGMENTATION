@@ -21,10 +21,12 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307 USA
 #ifndef CONV_H
 #define CONV_H
 
-#include <climits>
+#include "climits"
 #include "image.h"
 #include "imutil.h"
 #include "misc.h"
+#include "cuda_image_ops.h"
+
 
 #define	RED_WEIGHT	0.299
 #define GREEN_WEIGHT	0.587
@@ -35,15 +37,13 @@ static image<uchar> *imageRGBtoGRAY(image<rgb> *input) {
   int height = input->height();
   image<uchar> *output = new image<uchar>(width, height, false);
 
-  #pragma omp parallel for collapse(2)
-  for (int y = 0; y < height; y++) {
-    for (int x = 0; x < width; x++) {
-      imRef(output, x, y) = (uchar)
-        (imRef(input, x, y).r * RED_WEIGHT +
-         imRef(input, x, y).g * GREEN_WEIGHT +
-         imRef(input, x, y).b * BLUE_WEIGHT);
-    }
-  }
+  convertRGBtoGRAYCUDA(
+    (const unsigned char*)imPtr(input, 0, 0),
+    (unsigned char*)imPtr(output, 0, 0),
+    width,
+    height
+  );
+
   return output;
 }
 
@@ -53,7 +53,6 @@ static image<rgb> *imageGRAYtoRGB(image<uchar> *input) {
   int height = input->height();
   image<rgb> *output = new image<rgb>(width, height, false);
 
-  #pragma omp parallel for collapse(2)
   for (int y = 0; y < height; y++) {
     for (int x = 0; x < width; x++) {
       imRef(output, x, y).r = imRef(input, x, y);
@@ -69,22 +68,19 @@ static image<float> *imageUCHARtoFLOAT(image<uchar> *input) {
   int height = input->height();
   image<float> *output = new image<float>(width, height, false);
 
-  #pragma omp parallel for collapse(2)
   for (int y = 0; y < height; y++) {
     for (int x = 0; x < width; x++) {
       imRef(output, x, y) = imRef(input, x, y);
     }
   }
-  return output;
+  return output;  
 }
-
 
 static image<float> *imageINTtoFLOAT(image<int> *input) {
   int width = input->width();
   int height = input->height();
   image<float> *output = new image<float>(width, height, false);
 
-  #pragma omp parallel for collapse(2)
   for (int y = 0; y < height; y++) {
     for (int x = 0; x < width; x++) {
       imRef(output, x, y) = imRef(input, x, y);
@@ -94,7 +90,7 @@ static image<float> *imageINTtoFLOAT(image<int> *input) {
 }
 
 static image<uchar> *imageFLOATtoUCHAR(image<float> *input, 
-  float min, float max) {
+				       float min, float max) {
   int width = input->width();
   int height = input->height();
   image<uchar> *output = new image<uchar>(width, height, false);
@@ -103,19 +99,14 @@ static image<uchar> *imageFLOATtoUCHAR(image<float> *input,
     return output;
 
   float scale = UCHAR_MAX / (max - min);
-
-  // Paralelizar el bucle exterior (sobre las filas)
-  #pragma omp parallel for
   for (int y = 0; y < height; y++) {
     for (int x = 0; x < width; x++) {
       uchar val = (uchar)((imRef(input, x, y) - min) * scale);
       imRef(output, x, y) = bound(val, (uchar)0, (uchar)UCHAR_MAX);
+    }
   }
+  return output;
 }
-return output;
-}
-
-
 
 static image<uchar> *imageFLOATtoUCHAR(image<float> *input) {
   float min, max;
@@ -128,7 +119,6 @@ static image<long> *imageUCHARtoLONG(image<uchar> *input) {
   int height = input->height();
   image<long> *output = new image<long>(width, height, false);
 
-  #pragma omp parallel for collapse(2)
   for (int y = 0; y < height; y++) {
     for (int x = 0; x < width; x++) {
       imRef(output, x, y) = imRef(input, x, y);
@@ -146,18 +136,14 @@ static image<uchar> *imageLONGtoUCHAR(image<long> *input, long min, long max) {
     return output;
 
   float scale = UCHAR_MAX / (float)(max - min);
-
-  #pragma omp parallel for collapse(2)
   for (int y = 0; y < height; y++) {
     for (int x = 0; x < width; x++) {
       uchar val = (uchar)((imRef(input, x, y) - min) * scale);
       imRef(output, x, y) = bound(val, (uchar)0, (uchar)UCHAR_MAX);
     }
   }
-
   return output;
 }
-
 
 static image<uchar> *imageLONGtoUCHAR(image<long> *input) {
   long min, max;
@@ -165,7 +151,8 @@ static image<uchar> *imageLONGtoUCHAR(image<long> *input) {
   return imageLONGtoUCHAR(input, min, max);
 }
 
-static image<uchar> *imageSHORTtoUCHAR(image<short> *input, short min, short max) {
+static image<uchar> *imageSHORTtoUCHAR(image<short> *input, 
+					short min, short max) {
   int width = input->width();
   int height = input->height();
   image<uchar> *output = new image<uchar>(width, height, false);
@@ -174,18 +161,14 @@ static image<uchar> *imageSHORTtoUCHAR(image<short> *input, short min, short max
     return output;
 
   float scale = UCHAR_MAX / (float)(max - min);
-
-  #pragma omp parallel for collapse(2)
   for (int y = 0; y < height; y++) {
     for (int x = 0; x < width; x++) {
       uchar val = (uchar)((imRef(input, x, y) - min) * scale);
       imRef(output, x, y) = bound(val, (uchar)0, (uchar)UCHAR_MAX);
     }
   }
-
   return output;
 }
-
 
 static image<uchar> *imageSHORTtoUCHAR(image<short> *input) {
   short min, max;

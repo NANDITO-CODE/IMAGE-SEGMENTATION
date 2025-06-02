@@ -21,12 +21,13 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307 USA
 #ifndef FILTER_H
 #define FILTER_H
 
-#include <vector>
-#include <cmath>
+#include "vector"
+#include "cmath"
 #include "image.h"
 #include "misc.h"
 #include "convolve.h"
 #include "imconv.h"
+#include "cuda_image_ops.h"
 
 #define WIDTH 4.0
 
@@ -43,35 +44,46 @@ static void normalize(std::vector<float> &mask) {
   }
 }
 
-/* make filters */
-#define MAKE_FILTER(name, fun)                                \
-static std::vector<float> make_ ## name (float sigma) {       \
-  sigma = std::max(sigma, 0.01F);			      \
-  int len = (int)ceil(sigma * WIDTH) + 1;                     \
-  std::vector<float> mask(len);                               \
-  for (int i = 0; i < len; i++) {                             \
-    mask[i] = fun;                                            \
-  }                                                           \
-  return mask;                                                \
-}
+/* make gaussian filter */
+static std::vector<float> make_fgauss(float sigma) {
+  sigma = std::max(sigma, 0.01F);
+  int len = (int)ceil(sigma * WIDTH) + 1;
+  std::vector<float> mask(len);
+  
+  for (int i = 0; i < len; i++) {
+    float x = (float)i;
+    mask[i] = expf(-0.5f * (x * x) / (sigma * sigma));
+  }
 
-MAKE_FILTER(fgauss, exp(-0.5*square(i/sigma)));
+  // Normalize mask so sum equals 1
+  float sum = mask[0];
+  for (int i = 1; i < len; i++) {
+    sum += 2 * mask[i];  // symmetric filter
+  }
+  for (int i = 0; i < len; i++) {
+    mask[i] /= sum;
+  }
+
+  return mask;
+}
 
 /* convolve image with gaussian filter */
 static image<float> *smooth(image<float> *src, float sigma) {
   std::vector<float> mask = make_fgauss(sigma);
   normalize(mask);
 
-  image<float> *tmp = new image<float>(src->height(), src->width(), false);
+  image<float> *tmp = new image<float>(src->width(), src->height(), false);
   image<float> *dst = new image<float>(src->width(), src->height(), false);
-  convolve_odd(src, tmp, mask);
-  convolve_odd(tmp, dst, mask);
+
+  // CUDA convolution calls (horizontal and vertical)
+  convolveEvenCUDA(imPtr(src, 0, 0), imPtr(tmp, 0, 0), src->width(), src->height(), mask.data(), (int)mask.size());
+  convolveEvenCUDA(imPtr(tmp, 0, 0), imPtr(dst, 0, 0), tmp->width(), tmp->height(), mask.data(), (int)mask.size());
 
   delete tmp;
   return dst;
 }
 
-/* convolve image with gaussian filter */
+/* convolve image with gaussian filter (uchar version) */
 image<float> *smooth(image<uchar> *src, float sigma) {
   image<float> *tmp = imageUCHARtoFLOAT(src);
   image<float> *dst = smooth(tmp, sigma);
@@ -83,17 +95,10 @@ image<float> *smooth(image<uchar> *src, float sigma) {
 static image<float> *laplacian(image<float> *src) {
   int width = src->width();
   int height = src->height();
-  image<float> *dst = new image<float>(width, height);  
+  image<float> *dst = new image<float>(width, height, false);
 
-  for (int y = 1; y < height-1; y++) {
-    for (int x = 1; x < width-1; x++) {
-      float d2x = imRef(src, x-1, y) + imRef(src, x+1, y) -
-	2*imRef(src, x, y);
-      float d2y = imRef(src, x, y-1) + imRef(src, x, y+1) -
-	2*imRef(src, x, y);
-      imRef(dst, x, y) = d2x + d2y;
-    }
-  }
+  laplacianCUDA(imPtr(src, 0, 0), imPtr(dst, 0, 0), width, height);
+
   return dst;
 }
 

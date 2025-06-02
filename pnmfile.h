@@ -21,10 +21,10 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307 USA
 #ifndef PNM_FILE_H
 #define PNM_FILE_H
 
-#include <cstdlib>
-#include <climits>
-#include <cstring>
-#include <fstream>
+#include "cstdlib"
+#include "climits"
+#include "cstring"
+#include "fstream"
 #include "image.h"
 #include "misc.h"
 
@@ -36,34 +36,28 @@ static void read_packed(unsigned char *data, int size, std::ifstream &f) {
   unsigned char c = 0;
   
   int bitshift = -1;
-
-  #pragma omp parallel for
   for (int pos = 0; pos < size; pos++) {
     if (bitshift == -1) {
-      #pragma omp critical
-      c = f.get(); // Solo un hilo puede acceder a f.get() a la vez
+      c = f.get();
       bitshift = 7;
     }
     data[pos] = (c >> bitshift) & 1;
     bitshift--;
-  }
+    }
 }
 
 static void write_packed(unsigned char *data, int size, std::ofstream &f) {
   unsigned char c = 0;
   
   int bitshift = 7;
-
-  #pragma omp parallel for
   for (int pos = 0; pos < size; pos++) {
-    c = c | (data[pos] << bitshift);
-    bitshift--;
-    if ((bitshift == -1) || (pos == size-1)) {
-      #pragma omp critical
-      f.put(c);  // Sincroniza la escritura en el archivo
-      bitshift = 7;
-      c = 0;
-    }
+      c = c | (data[pos] << bitshift);
+      bitshift--;
+      if ((bitshift == -1) || (pos == size-1)) {
+	f.put(c);
+	bitshift = 7;
+	c = 0;
+      }
   }
 }
 
@@ -90,27 +84,21 @@ static image<uchar> *loadPBM(const char *name) {
   /* read header */
   std::ifstream file(name, std::ios::in | std::ios::binary);
   pnm_read(file, buf);
-  if (strncmp(buf, "P4", 2)) // Verificar que sea formato P4 (imagen binaria)
+  if (strncmp(buf, "P4", 2))
     throw pnm_error();
     
   pnm_read(file, buf);
-  int width = atoi(buf); // Leer el ancho de la imagen
+  int width = atoi(buf);
   pnm_read(file, buf);
-  int height = atoi(buf); // Leer la altura de la imagen
+  int height = atoi(buf);
   
   /* read data */
-  image<uchar> *im = new image<uchar>(width, height); // Crear la imagen
-
-  // Paralelizar la lectura de cada fila
-  #pragma omp parallel for
-  for (int i = 0; i < height; i++) {
-    read_packed(imPtr(im, 0, i), width, file); // Leer los datos de la fila 'i'
-  }
-
+  image<uchar> *im = new image<uchar>(width, height);
+  for (int i = 0; i < height; i++)
+    read_packed(imPtr(im, 0, i), width, file);
+  
   return im;
 }
-
-
 
 static void savePBM(image<uchar> *im, const char *name) {
   int width = im->width();
@@ -118,13 +106,9 @@ static void savePBM(image<uchar> *im, const char *name) {
   std::ofstream file(name, std::ios::out | std::ios::binary);
 
   file << "P4\n" << width << " " << height << "\n";
-
-  #pragma omp parallel for
-  for (int i = 0; i < height; i++) {
+  for (int i = 0; i < height; i++)
     write_packed(imPtr(im, 0, i), width, file);
-  }
 }
-
 
 static image<uchar> *loadPGM(const char *name) {
   char buf[BUF_SIZE];

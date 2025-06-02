@@ -23,6 +23,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307 USA
 
 #include "image.h"
 #include "misc.h"
+#include "cuda_image_ops.h"
+
 
 /* compute minimum and maximum value in an image */
 template <class T>
@@ -32,22 +34,19 @@ void min_max(image<T> *im, T *ret_min, T *ret_max) {
   
   T min = imRef(im, 0, 0);
   T max = imRef(im, 0, 0);
-
-  #pragma omp parallel for collapse(2) reduction(min: min) reduction(max: max)
   for (int y = 0; y < height; y++) {
     for (int x = 0; x < width; x++) {
       T val = imRef(im, x, y);
       if (min > val)
-        min = val;
+	min = val;
       if (max < val)
-        max = val;
+	max = val;
     }
   }
 
   *ret_min = min;
   *ret_max = max;
-}
-
+} 
 
 /* threshold image */
 template <class T>
@@ -56,12 +55,14 @@ image<uchar> *threshold(image<T> *src, int t) {
   int height = src->height();
   image<uchar> *dst = new image<uchar>(width, height);
 
-  #pragma omp parallel for collapse(2)
-  for (int y = 0; y < height; y++) {
-    for (int x = 0; x < width; x++) {
-      imRef(dst, x, y) = (imRef(src, x, y) >= t);
-    }
-  }
+  // Llamada a función CUDA
+  thresholdCUDA(
+    (const unsigned char*)imPtr(src, 0, 0),
+    (unsigned char*)imPtr(dst, 0, 0),
+    width,
+    height,
+    t
+  );
 
   return dst;
 }

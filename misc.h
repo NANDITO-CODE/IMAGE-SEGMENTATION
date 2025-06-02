@@ -21,7 +21,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307 USA
 #ifndef MISC_H
 #define MISC_H
 
-#include <cmath>
+#include "cmath"
 
 #ifndef M_PI
 #define M_PI 3.141592653589793
