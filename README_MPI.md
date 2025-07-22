@@ -14,8 +14,9 @@ Este proyecto implementa el algoritmo de segmentación de grafos de Felzenszwalb
 ## Compilación
 
 ```bash
-# Compilar todas las versiones
-make all
+# Compilar en ubuntu - ejemplo
+make
+mpirun -np 4 ./segment-mpi 0.5 500 20 image_data/machupicchu.pnm salida-mpi.ppm
 
 # O compilar individualmente
 make segment      # versión serial
