@@ -21,10 +21,10 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307 USA
 #ifndef PNM_FILE_H
 #define PNM_FILE_H
 
-#include "cstdlib"
-#include "climits"
-#include "cstring"
-#include "fstream"
+#include <cstdlib>
+#include <climits>
+#include <cstring>
+#include <fstream>
 #include "image.h"
 #include "misc.h"
 

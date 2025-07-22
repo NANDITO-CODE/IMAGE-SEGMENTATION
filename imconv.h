@@ -21,12 +21,10 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307 USA
 #ifndef CONV_H
 #define CONV_H
 
-#include "climits"
+#include <climits>
 #include "image.h"
 #include "imutil.h"
 #include "misc.h"
-#include "cuda_image_ops.h"
-
 
 #define	RED_WEIGHT	0.299
 #define GREEN_WEIGHT	0.587
@@ -37,16 +35,16 @@ static image<uchar> *imageRGBtoGRAY(image<rgb> *input) {
   int height = input->height();
   image<uchar> *output = new image<uchar>(width, height, false);
 
-  convertRGBtoGRAYCUDA(
-    (const unsigned char*)imPtr(input, 0, 0),
-    (unsigned char*)imPtr(output, 0, 0),
-    width,
-    height
-  );
-
+  for (int y = 0; y < height; y++) {
+    for (int x = 0; x < width; x++) {
+      imRef(output, x, y) = (uchar)
+	(imRef(input, x, y).r * RED_WEIGHT +
+	 imRef(input, x, y).g * GREEN_WEIGHT +
+	 imRef(input, x, y).b * BLUE_WEIGHT);
+    }
+  }
   return output;
 }
-
 
 static image<rgb> *imageGRAYtoRGB(image<uchar> *input) {
   int width = input->width();

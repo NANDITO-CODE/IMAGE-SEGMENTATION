@@ -23,8 +23,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307 USA
 
 #include "image.h"
 #include "misc.h"
-#include "cuda_image_ops.h"
-
 
 /* compute minimum and maximum value in an image */
 template <class T>
@@ -54,19 +52,15 @@ image<uchar> *threshold(image<T> *src, int t) {
   int width = src->width();
   int height = src->height();
   image<uchar> *dst = new image<uchar>(width, height);
-
-  // Llamada a función CUDA
-  thresholdCUDA(
-    (const unsigned char*)imPtr(src, 0, 0),
-    (unsigned char*)imPtr(dst, 0, 0),
-    width,
-    height,
-    t
-  );
+  
+  for (int y = 0; y < height; y++) {
+    for (int x = 0; x < width; x++) {
+      imRef(dst, x, y) = (imRef(src, x, y) >= t);
+    }
+  }
 
   return dst;
 }
-
 
 #endif
 
